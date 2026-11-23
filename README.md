@@ -23,7 +23,9 @@ Open a run awaiting review and check the Gherkin and its SHA-256. Approve that v
 
 The feature follows the Knowledge Assistant Web layers. The Angular pages use a facade backed by NgRx effects and state. A repository port isolates the Angular HTTP adapter. Run queries and decisions use generated OpenAPI types.
 
-The [pinned API contract](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/blob/5d790ce7128cc0f95135a76f7f4f888db68dc045/docs/openapi/agent-orchestrator.v1.yaml) lives in `contracts/`. Run `npm run generate:types` after updating that snapshot.
+The pinned API contract lives in `contracts/`. Run `npm run generate:types` after updating that snapshot. [API OpenAPI contract](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/blob/50b5075a44170a25b813a7acb9d26c6949496364/docs/openapi/agent-orchestrator.v1.yaml)
+
+The catalog rehearsal follows the run from the BA handoff through review to the Playwright and Allure evidence. A trace correlation ID in the timeline lets you find worker attempts in the configured LangSmith project. [Demo walkthrough](https://github.com/MichalBoczula/ECommerceStore.AgentOrchestrator.Api/blob/50b5075a44170a25b813a7acb9d26c6949496364/docs/demo.md)
 
 ## Verify
 
