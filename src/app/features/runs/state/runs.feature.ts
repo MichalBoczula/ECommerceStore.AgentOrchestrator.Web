@@ -1,15 +1,22 @@
 import { createFeature, createReducer, on } from '@ngrx/store';
-import type { ReadState, RunDetail, RunPage } from '../domain/runs';
+import type {
+  DecisionState,
+  ReadState,
+  RunDetail,
+  RunPage,
+} from '../domain/runs';
 import { RunsActions } from './runs.actions';
 
 interface RunsState {
   page: ReadState<RunPage>;
   run: ReadState<RunDetail>;
+  decision: DecisionState;
 }
 
 const initialState: RunsState = {
   page: { kind: 'loading' },
   run: { kind: 'loading' },
+  decision: { kind: 'idle' },
 };
 
 export const runsFeature = createFeature({
@@ -29,5 +36,17 @@ export const runsFeature = createFeature({
       ...state,
       run: result,
     })),
+    on(RunsActions.decisionRequested, (state): RunsState => ({
+      ...state,
+      decision: { kind: 'submitting' },
+    })),
+    on(
+      RunsActions.decisionResolved,
+      (state, { result, refreshedRun }): RunsState => ({
+        ...state,
+        run: refreshedRun ?? state.run,
+        decision: { kind: 'resolved', result },
+      }),
+    ),
   ),
 });

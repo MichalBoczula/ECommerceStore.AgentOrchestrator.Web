@@ -19,11 +19,21 @@
     class="button"
     type="button"
     (click)="reload()"
-    [disabled]="view.kind === 'loading'"
+    [disabled]="view.kind === 'loading' || submitting()"
   >
     Refresh
   </button>
 </header>
+
+@if (decisionFeedback(); as feedback) {
+  <p
+    class="decision-feedback"
+    [attr.data-result]="feedback.kind"
+    [attr.role]="feedback.kind === 'blocked' ? 'alert' : 'status'"
+  >
+    {{ feedback.text }}
+  </p>
+}
 
 <div [attr.aria-busy]="view.kind === 'loading'">
   @if (view.kind === 'loading') {
@@ -159,6 +169,14 @@
             </dl>
             @if (detail.status === 'awaiting_review') {
               <p class="notice">This version is awaiting a review decision.</p>
+              <!-- Reset the draft reason when a different proposal revision is loaded. -->
+              @for (sha of [review.featureSha256]; track sha) {
+                <app-run-review
+                  [featureSha256]="sha"
+                  [submitting]="submitting()"
+                  (decided)="decide(detail.runId, $event)"
+                />
+              }
             }
             @if (detail.decision; as decision) {
               <div class="decision">

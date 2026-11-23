@@ -1,0 +1,65 @@
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: start;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.rejection[open] {
+  width: 100%;
+}
+
+.review-actions:has(.rejection[open]) .approve-button {
+  display: none;
+}
+
+summary {
+  list-style: none;
+}
+
+.rejection-form {
+  display: grid;
+  justify-items: start;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+  max-width: 42rem;
+}
+
+.rejection-form label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rejection-form textarea {
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  resize: vertical;
+  border: 1px solid #c8d2e2;
+  border-radius: 0.48rem;
+  color: var(--ink);
+  font: inherit;
+}
+
+.rejection-form textarea[aria-invalid='true'] {
+  border-color: #982f49;
+}
+
+.rejection-form p,
+.review-progress {
+  font-size: 0.875rem;
+}
+
+.review-progress {
+  flex-basis: 100%;
+}
+
+.reject-button:not(:disabled) {
+  color: #982f49;
+  border-color: #e3a8b4;
+}
+
+.reject-button:hover:not(:disabled) {
+  background: #fff2f4;
+  border-color: #982f49;
+}
