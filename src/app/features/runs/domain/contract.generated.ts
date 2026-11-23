@@ -125,6 +125,8 @@ export interface components {
     };
     RunDetail: components['schemas']['RunSummary'] & {
       input: components['schemas']['RunInput'];
+      /** @description Pseudonymous worker trace correlation ID. Search it in the configured LangSmith project. */
+      traceCorrelationId?: components['schemas']['Sha256'];
       /** @description Durable stage transitions in chronological order. */
       history: components['schemas']['RunHistoryEntry'][];
       handoff?: components['schemas']['Handoff'];

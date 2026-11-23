@@ -82,6 +82,14 @@
               }}</time>
             </dd>
           </div>
+          @if (detail.traceCorrelationId; as correlationId) {
+            <div>
+              <dt>Trace correlation ID</dt>
+              <dd>
+                <code>{{ correlationId }}</code>
+              </dd>
+            </div>
+          }
         </dl>
       </section>
 

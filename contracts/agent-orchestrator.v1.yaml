@@ -402,6 +402,9 @@ components:
           properties:
             input:
               $ref: '#/components/schemas/RunInput'
+            traceCorrelationId:
+              description: Pseudonymous worker trace correlation ID. Search it in the configured LangSmith project.
+              $ref: '#/components/schemas/Sha256'
             history:
               type: array
               minItems: 1
