@@ -1,0 +1,114 @@
+<section class="panel padded" aria-labelledby="ci-heading">
+  <h2 id="ci-heading">Publication and CI</h2>
+  @if (publication(); as published) {
+    <p class="publication">
+      @if (webLink(published.url); as url) {
+        <a [href]="url" target="_blank" rel="noopener noreferrer">
+          @if (published.outcome === 'pull_request') {
+            Pull request #{{ published.pullRequestNumber }} ↗
+          } @else {
+            Feature on main ↗
+          }
+        </a>
+      }
+      <span class="muted">{{ published.repository }}</span>
+    </p>
+  } @else {
+    <p class="muted">No publication is available for this run.</p>
+  }
+
+  @if (ci(); as evidence) {
+    <dl class="ci-statuses">
+      <div>
+        <dt>Gherkin check</dt>
+        <dd><app-status-badge [status]="evidence.gherkinCheckStatus" /></dd>
+      </div>
+      <div>
+        <dt>Playwright</dt>
+        <dd><app-status-badge [status]="evidence.status" /></dd>
+      </div>
+    </dl>
+    @if (evidence.reasonCode; as reason) {
+      @if (reasonMessages[reason]; as message) {
+        <p class="muted">{{ message }}</p>
+      } @else {
+        <p class="muted">
+          Evidence reason <code>{{ reason }}</code>
+        </p>
+      }
+    }
+    <div class="evidence-links">
+      @if (webLink(evidence.workflowRunUrl); as url) {
+        <a class="button" [href]="url" target="_blank" rel="noopener noreferrer"
+          >GitHub Actions run ↗</a
+        >
+      }
+      @if (webLink(evidence.allureArtifact?.url); as url) {
+        <a class="button" [href]="url" target="_blank" rel="noopener noreferrer"
+          >Allure artifact ↗</a
+        >
+      }
+    </div>
+    @if (
+      evidence.currentHeadSha &&
+      evidence.observedHeadSha &&
+      evidence.currentHeadSha !== evidence.observedHeadSha
+    ) {
+      <p class="notice">This result applies to an earlier PR revision.</p>
+    }
+    <dl class="metadata">
+      @if (evidence.runAttempt) {
+        <div>
+          <dt>Workflow attempt</dt>
+          <dd>{{ evidence.runAttempt }}</dd>
+        </div>
+      }
+      @if (evidence.observedHeadSha) {
+        <div>
+          <dt>Observed PR head</dt>
+          <dd>
+            <code>{{ evidence.observedHeadSha }}</code>
+          </dd>
+        </div>
+      } @else if (publication(); as published) {
+        <div>
+          <dt>Published commit</dt>
+          <dd>
+            <code>{{ published.commitSha }}</code>
+          </dd>
+        </div>
+      }
+      @if (
+        evidence.currentHeadSha &&
+        evidence.currentHeadSha !== evidence.observedHeadSha
+      ) {
+        <div>
+          <dt>Current PR head</dt>
+          <dd>
+            <code>{{ evidence.currentHeadSha }}</code>
+          </dd>
+        </div>
+      }
+      @if (evidence.testedCommitSha) {
+        <div>
+          <dt>Tested commit</dt>
+          <dd>
+            <code>{{ evidence.testedCommitSha }}</code>
+          </dd>
+        </div>
+      }
+    </dl>
+  } @else {
+    <p class="muted">CI evidence is unavailable for this run.</p>
+    @if (publication(); as published) {
+      <dl class="metadata">
+        <div>
+          <dt>Published commit</dt>
+          <dd>
+            <code>{{ published.commitSha }}</code>
+          </dd>
+        </div>
+      </dl>
+    }
+  }
+</section>

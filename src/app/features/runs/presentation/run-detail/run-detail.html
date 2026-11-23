@@ -1,0 +1,185 @@
+@let view = run();
+
+<a class="back-link" routerLink="/runs" queryParamsHandling="preserve">
+  <span aria-hidden="true">←</span> All runs
+</a>
+<header class="page-heading detail-heading">
+  <div>
+    @if (view.kind === 'ready') {
+      <div class="heading-with-status">
+        <h1>{{ view.value.jiraIssueKey || 'Run details' }}</h1>
+        <app-status-badge [status]="view.value.status" />
+      </div>
+    } @else {
+      <h1>Run details</h1>
+    }
+    <code class="detail-reference">{{ runId() }}</code>
+  </div>
+  <button
+    class="button"
+    type="button"
+    (click)="reload()"
+    [disabled]="view.kind === 'loading'"
+  >
+    Refresh
+  </button>
+</header>
+
+<div [attr.aria-busy]="view.kind === 'loading'">
+  @if (view.kind === 'loading') {
+    <div class="panel empty-panel" role="status"><p>Loading run…</p></div>
+  } @else if (view.kind === 'error') {
+    <div class="panel">
+      <app-read-error [reason]="view.reason" (retry)="reload()" />
+    </div>
+  } @else {
+    @let detail = view.value;
+
+    @if (detail.failure; as failure) {
+      <aside class="failure-panel" aria-label="Run failure">
+        <strong>Workflow failed</strong>
+        <p>{{ failure.detail }}</p>
+        <code>{{ failure.code }}</code>
+      </aside>
+    }
+
+    <div class="detail-grid">
+      <section
+        class="panel padded timeline-panel"
+        aria-labelledby="timeline-heading"
+      >
+        <h2 id="timeline-heading">Workflow timeline</h2>
+        @if (detail.history.length) {
+          <ol class="timeline">
+            @for (event of detail.history; track $index) {
+              <li [attr.aria-current]="$last ? 'step' : null">
+                <app-status-badge [status]="event.status" />
+                <time [attr.datetime]="event.at">{{
+                  event.at | date: 'MMM d, y · HH:mm:ss'
+                }}</time>
+              </li>
+            }
+          </ol>
+        } @else {
+          <p class="muted">No workflow history is available.</p>
+        }
+        <dl class="metadata timeline-meta">
+          <div>
+            <dt>Last updated</dt>
+            <dd>
+              <time [attr.datetime]="detail.updatedAt">{{
+                detail.updatedAt | date: 'MMM d, y · HH:mm:ss'
+              }}</time>
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="detail-primary">
+        <section class="panel padded" aria-labelledby="handoff-heading">
+          <div class="section-heading">
+            <h2 id="handoff-heading">BA handoff</h2>
+            @if (detail.handoff; as handoff) {
+              <code class="endpoint"
+                >{{ handoff.method }} {{ handoff.path }}</code
+              >
+            }
+          </div>
+          @if (detail.handoff; as handoff) {
+            <h3>{{ handoff.criterion.title }}</h3>
+            <dl class="criterion">
+              <dt>Given</dt>
+              <dd>{{ handoff.criterion.given }}</dd>
+              <dt>When</dt>
+              <dd>{{ handoff.criterion.when }}</dd>
+              <dt>Then</dt>
+              <dd>{{ handoff.criterion.then }}</dd>
+            </dl>
+            <dl class="metadata metadata-row">
+              <div>
+                <dt>Knowledge snapshot</dt>
+                <dd>
+                  <code>{{ handoff.snapshotId }}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>BA draft SHA-256</dt>
+                <dd>
+                  <code>{{ handoff.draftSha256 }}</code>
+                </dd>
+              </div>
+            </dl>
+            <h3 class="sources-heading">Sources</h3>
+            @if (handoff.sources.length) {
+              <ul class="sources">
+                @for (source of handoff.sources; track source.id) {
+                  <li>
+                    @if (webLink(source.url); as url) {
+                      <a [href]="url" target="_blank" rel="noopener noreferrer"
+                        >{{ source.title }} ↗</a
+                      >
+                    } @else {
+                      <strong>{{ source.title }}</strong>
+                    }
+                    <code>{{ source.path }}</code>
+                    <span class="source-revision"
+                      >Commit
+                      <code [title]="source.commitSha">{{
+                        source.commitSha.slice(0, 12)
+                      }}</code></span
+                    >
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="muted">No sources are available for this criterion.</p>
+            }
+          } @else {
+            <p class="muted">Handoff details are unavailable for this run.</p>
+          }
+        </section>
+
+        <section class="panel padded" aria-labelledby="gherkin-heading">
+          <h2 id="gherkin-heading">Gherkin proposal</h2>
+          @if (detail.review; as review) {
+            <p class="feature-path">
+              <code>{{ review.path }}</code>
+            </p>
+            <pre
+              tabindex="0"
+              aria-label="Gherkin feature"
+            ><code>{{ review.feature }}</code></pre>
+            <dl class="metadata">
+              <div>
+                <dt>Feature SHA-256</dt>
+                <dd>
+                  <code>{{ review.featureSha256 }}</code>
+                </dd>
+              </div>
+            </dl>
+            @if (detail.status === 'awaiting_review') {
+              <p class="notice">This version is awaiting a review decision.</p>
+            }
+            @if (detail.decision; as decision) {
+              <div class="decision">
+                <strong>{{
+                  decision.decision === 'approve' ? 'Approved' : 'Rejected'
+                }}</strong>
+                <time [attr.datetime]="decision.decidedAt">{{
+                  decision.decidedAt | date: 'MMM d, y · HH:mm'
+                }}</time>
+                @if (decision.reason) {
+                  <p>{{ decision.reason }}</p>
+                }
+              </div>
+            }
+          } @else {
+            <p class="muted">No Gherkin proposal is available.</p>
+          }
+        </section>
+
+        <app-ci-panel [publication]="detail.publication" [ci]="detail.ci" />
+      </div>
+    </div>
+  }
+</div>

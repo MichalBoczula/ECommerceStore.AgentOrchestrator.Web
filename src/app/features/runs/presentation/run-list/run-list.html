@@ -1,0 +1,136 @@
+@let view = page();
+<header class="page-heading">
+  <div>
+    <h1>Workflow runs</h1>
+    <p>Follow BA handoffs, QA proposals, and storefront test evidence.</p>
+  </div>
+  <button
+    class="button"
+    type="button"
+    (click)="reload()"
+    [disabled]="view.kind === 'loading'"
+  >
+    Refresh
+  </button>
+</header>
+
+<section
+  class="panel run-list"
+  aria-label="Run list"
+  [attr.aria-busy]="view.kind === 'loading'"
+>
+  <div class="list-toolbar">
+    <div class="filter">
+      <label for="run-status">Status</label>
+      <select id="run-status" #status (change)="changeStatus(status.value)">
+        <option value="" [selected]="!query().status">All statuses</option>
+        @for (option of statusOptions; track option.value) {
+          <option
+            [value]="option.value"
+            [selected]="option.value === query().status"
+          >
+            {{ option.label }}
+          </option>
+        }
+      </select>
+    </div>
+    @if (view.kind === 'ready') {
+      <span class="page-count">{{ view.value.items.length }} on this page</span>
+    }
+  </div>
+
+  @if (view.kind === 'loading') {
+    <div class="empty-panel" role="status"><p>Loading runs…</p></div>
+  } @else if (view.kind === 'error') {
+    <app-read-error [reason]="view.reason" (retry)="reload()" />
+  } @else {
+    @if (view.value.items.length) {
+      <div
+        class="table-scroll"
+        tabindex="0"
+        role="region"
+        aria-label="Workflow runs table"
+      >
+        <table class="run-table">
+          <thead>
+            <tr>
+              <th scope="col">Run</th>
+              <th scope="col">Status</th>
+              <th scope="col">Created</th>
+              <th scope="col">Last updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (run of view.value.items; track run.runId) {
+              <tr>
+                <td>
+                  <a
+                    class="run-link"
+                    [routerLink]="['/runs', run.runId]"
+                    queryParamsHandling="preserve"
+                  >
+                    {{ run.jiraIssueKey || 'Run ' + run.runId.slice(0, 8) }}
+                    <span aria-hidden="true">→</span>
+                  </a>
+                  <code class="run-reference" [title]="run.runId">{{
+                    run.runId.slice(0, 8)
+                  }}</code>
+                </td>
+                <td><app-status-badge [status]="run.status" /></td>
+                <td>
+                  <time [attr.datetime]="run.createdAt">{{
+                    run.createdAt | date: 'MMM d, y · HH:mm'
+                  }}</time>
+                </td>
+                <td>
+                  <time [attr.datetime]="run.updatedAt">{{
+                    run.updatedAt | date: 'MMM d, y · HH:mm'
+                  }}</time>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-panel" role="status">
+        <p class="state-title">No runs found</p>
+        @if (query().status) {
+          <p>Choose another status or clear the filter.</p>
+          <button class="button" type="button" (click)="changeStatus('')">
+            Clear filter
+          </button>
+        } @else {
+          <p>Runs appear after an operator starts them.</p>
+        }
+      </div>
+    }
+
+    @if (query().cursor || view.value.nextCursor) {
+      <div class="pagination" role="navigation" aria-label="Runs pagination">
+        @if (query().cursor) {
+          <button class="button" type="button" (click)="openPage()">
+            First page
+          </button>
+        }
+        @if (view.value.nextCursor; as cursor) {
+          <button
+            class="button primary-button"
+            type="button"
+            (click)="openPage(cursor)"
+          >
+            Next page
+          </button>
+        }
+      </div>
+    }
+  }
+
+  @if (view.kind === 'error' && query().cursor) {
+    <div class="pagination">
+      <button class="button" type="button" (click)="openPage()">
+        First page
+      </button>
+    </div>
+  }
+</section>

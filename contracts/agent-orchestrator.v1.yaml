@@ -1,0 +1,763 @@
+openapi: 3.1.0
+info:
+  title: ECommerceStore Agent Orchestrator API
+  version: 0.1.0
+  description: |
+    Start and review a durable storefront QA run from a published BA handoff.
+    The examples use synthetic handoff and CI identifiers.
+tags:
+  - name: Runs
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/runs:
+    post:
+      tags: [Runs]
+      summary: Queue a run
+      operationId: startRun
+      description: |
+        Requires permission to start runs. The caller's Idempotency-Key and validated
+        request identify the run for its lifetime. Replaying both returns the same
+        runId and Location. BA handoff validation runs after the request is accepted.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9._:-]{1,128}$'
+          example: start-demo-catalog-1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunInput'
+            example: &demoInput
+              baSessionId: 10000000-0000-4000-8000-000000000001
+              baRunId: 10000000-0000-4000-8000-000000000002
+              criterionIndex: 0
+      responses:
+        '202':
+          description: Run queued, or the original run returned on replay.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri-reference
+              example: /api/v1/runs/10000000-0000-4000-8000-000000000003
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunAccepted'
+              examples:
+                queued:
+                  value: &demoAccepted
+                    runId: 10000000-0000-4000-8000-000000000003
+                replayed:
+                  value: *demoAccepted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/StartConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+    get:
+      tags: [Runs]
+      summary: List accessible runs
+      operationId: listRuns
+      description: Results are ordered by createdAt and runId, both descending.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/RunStatus'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          description: Opaque next-page cursor returned for this caller and status filter.
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Page of run summaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/runs/{runId}:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    get:
+      tags: [Runs]
+      summary: Read a run and its timeline
+      operationId: getRun
+      responses:
+        '200':
+          description: Run details with the records available for its current stage.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunDetail'
+              examples:
+                awaitingReview:
+                  value:
+                    runId: 10000000-0000-4000-8000-000000000003
+                    status: awaiting_review
+                    createdAt: '2026-11-22T12:00:00Z'
+                    updatedAt: '2026-11-22T12:00:05Z'
+                    jiraIssueKey: DEMO-101
+                    input: *demoInput
+                    handoff:
+                      jiraIssueKey: DEMO-101
+                      snapshotId: demo-catalog-v1
+                      evidenceExchangeId: 10000000-0000-4000-8000-000000000004
+                      approvedAt: '2026-11-22T11:50:00Z'
+                      publishedAt: '2026-11-22T11:55:00Z'
+                      draftSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                      service: products
+                      method: GET
+                      path: /mobile-phones
+                      criterion:
+                        title: View details for a listed phone
+                        given: The smartphone catalog is open
+                        when: I select a listed smartphone
+                        then: The details match the selected phone and include its specifications
+                        sourceIds: [catalog-get]
+                      sources:
+                        - id: catalog-get
+                          title: Products Catalog GET contract
+                          path: sources/openapi.json#/paths/~1mobile-phones/get
+                          commitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                    review:
+                      qaSessionId: 10000000-0000-4000-8000-000000000005
+                      proposalId: 10000000-0000-4000-8000-000000000006
+                      path: features/catalog/browse-phone-details.feature
+                      featureSha256: &demoHash c9ec364c590c365b48cc456d90a379eea65af8edea5225e427ea2f7a8a133b7b
+                      feature: |
+                        # Managed by ECommerceStore.QA. Journey catalog-phone-details v1.
+                        # BA session 10000000-0000-4000-8000-000000000001
+                        # BA run 10000000-0000-4000-8000-000000000002
+                        # BA acceptanceCriteria[0]
+                        # BA draft SHA-256 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                        # Knowledge snapshot demo-catalog-v1
+                        @catalog @smoke
+                        Feature: Browse smartphone details
+
+                          Scenario: Open a listed smartphone and verify its details
+                            Given the smartphone catalog is open
+                            When I open a listed smartphone
+                            Then the details match the selected smartphone
+                            And I can see its specifications
+                    history:
+                      - status: queued
+                        at: '2026-11-22T12:00:00Z'
+                      - status: validating_handoff
+                        at: '2026-11-22T12:00:01Z'
+                      - status: authoring_proposal
+                        at: '2026-11-22T12:00:02Z'
+                      - status: awaiting_review
+                        at: '2026-11-22T12:00:05Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/RunNotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/runs/{runId}/decisions:
+    parameters:
+      - $ref: '#/components/parameters/RunId'
+    post:
+      tags: [Runs]
+      summary: Record a version-bound review decision
+      operationId: decideRun
+      description: |
+        Requires reviewer permission and access to the run. Only one decision can be
+        accepted for a pending review. The API supplies the identity and timestamp.
+        The worker picks up a durable approval for publication. Refresh the run after
+        a conflict or an ambiguous response.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionInput'
+            examples:
+              approve:
+                value:
+                  decision: approve
+                  expectedFeatureSha256: *demoHash
+              reject:
+                value:
+                  decision: reject
+                  expectedFeatureSha256: *demoHash
+                  reason: The criterion does not support the specifications assertion.
+      responses:
+        '202':
+          description: Decision recorded. An approval queues publication.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionAccepted'
+              examples:
+                approved:
+                  value:
+                    runId: 10000000-0000-4000-8000-000000000003
+                    status: publishing
+                rejected:
+                  value:
+                    runId: 10000000-0000-4000-8000-000000000003
+                    status: rejected
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/RunNotFound'
+        '409':
+          $ref: '#/components/responses/ReviewConflict'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/RunId'
+  responses:
+    BadRequest:
+      description: Header, cursor, path parameter, or body validation failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: The access token is missing or invalid.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+          example: Bearer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Forbidden:
+      description: The caller lacks the grant for this operation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RunNotFound:
+      description: The run is absent or outside the caller's access.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    StartConflict:
+      description: The idempotency key was already used with different input.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            status: 409
+            title: Idempotency key already used
+            code: idempotency_key_reused
+    ReviewConflict:
+      description: The submitted hash is stale or there is no open review.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            staleHash:
+              value:
+                status: 409
+                title: The reviewed feature has changed
+                code: stale_feature_hash
+            closedReview:
+              value:
+                status: 409
+                title: The review is no longer open
+                code: review_closed
+    Unavailable:
+      description: The API could not read or write durable run state.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    RunId:
+      type: string
+      format: uuid
+    Sha256:
+      type: string
+      pattern: '^[a-f0-9]{64}$'
+    GitSha:
+      type: string
+      pattern: '^[a-f0-9]{40}$'
+    RunInput:
+      type: object
+      additionalProperties: false
+      required: [baSessionId, baRunId, criterionIndex]
+      properties:
+        baSessionId:
+          type: string
+          format: uuid
+        baRunId:
+          type: string
+          format: uuid
+        criterionIndex:
+          type: integer
+          minimum: 0
+          description: Zero-based index into the published draft's acceptance criteria.
+    RunAccepted:
+      type: object
+      required: [runId]
+      properties:
+        runId:
+          $ref: '#/components/schemas/RunId'
+    RunStatus:
+      type: string
+      enum:
+        - queued
+        - validating_handoff
+        - authoring_proposal
+        - awaiting_review
+        - rejected
+        - publishing
+        - awaiting_ci
+        - completed
+        - failed
+      description: |
+        completed means orchestration reached a terminal publication or CI outcome.
+        failed means orchestration could not finish. The browser outcome is in ci.status.
+    RunSummary:
+      type: object
+      required: [runId, status, createdAt, updatedAt]
+      properties:
+        runId:
+          $ref: '#/components/schemas/RunId'
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        jiraIssueKey:
+          type: string
+          description: Available after the BA handoff has been verified.
+    RunPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunSummary'
+        nextCursor:
+          type: string
+          description: Omitted on the final page.
+    RunDetail:
+      allOf:
+        - $ref: '#/components/schemas/RunSummary'
+        - type: object
+          required: [input, history]
+          properties:
+            input:
+              $ref: '#/components/schemas/RunInput'
+            history:
+              type: array
+              minItems: 1
+              description: Durable stage transitions in chronological order.
+              items:
+                $ref: '#/components/schemas/RunHistoryEntry'
+            handoff:
+              $ref: '#/components/schemas/Handoff'
+            review:
+              $ref: '#/components/schemas/ReviewSnapshot'
+            decision:
+              $ref: '#/components/schemas/DecisionRecord'
+            publication:
+              $ref: '#/components/schemas/Publication'
+            ci:
+              $ref: '#/components/schemas/CiEvidence'
+            failure:
+              $ref: '#/components/schemas/RunFailure'
+    RunHistoryEntry:
+      type: object
+      required: [status, at]
+      properties:
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        at:
+          type: string
+          format: date-time
+    Handoff:
+      type: object
+      required:
+        [jiraIssueKey, snapshotId, evidenceExchangeId, approvedAt, publishedAt, draftSha256, service, method, path, criterion, sources]
+      properties:
+        jiraIssueKey:
+          type: string
+        snapshotId:
+          type: string
+        evidenceExchangeId:
+          type: string
+          format: uuid
+        approvedAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+        draftSha256:
+          $ref: '#/components/schemas/Sha256'
+        service:
+          type: string
+          enum: [products]
+        method:
+          type: string
+          enum: [GET]
+        path:
+          type: string
+          pattern: '^/mobile-phones(/\{[a-zA-Z0-9_]+\})?$'
+        criterion:
+          $ref: '#/components/schemas/Criterion'
+        sources:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Citation'
+    Criterion:
+      type: object
+      required: [title, given, when, then, sourceIds]
+      properties:
+        title:
+          type: string
+        given:
+          type: string
+        when:
+          type: string
+        then:
+          type: string
+        sourceIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+    Citation:
+      type: object
+      required: [id, title, path, commitSha]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        path:
+          type: string
+        commitSha:
+          type: string
+        url:
+          type: string
+          format: uri
+          pattern: '^https?://'
+    ReviewSnapshot:
+      type: object
+      description: Exact Gherkin staged for review. It remains available after a decision.
+      required: [qaSessionId, proposalId, path, featureSha256, feature]
+      properties:
+        qaSessionId:
+          type: string
+          format: uuid
+        proposalId:
+          type: string
+          format: uuid
+        path:
+          type: string
+        featureSha256:
+          $ref: '#/components/schemas/Sha256'
+        feature:
+          type: string
+          description: Exact UTF-8 content hashed by QA, including line endings.
+    DecisionKind:
+      type: string
+      enum: [approve, reject]
+    DecisionInput:
+      type: object
+      additionalProperties: false
+      required: [decision, expectedFeatureSha256]
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionKind'
+        expectedFeatureSha256:
+          $ref: '#/components/schemas/Sha256'
+        reason:
+          type: string
+          maxLength: 2000
+          pattern: '\S'
+          description: Non-blank reason required for rejection.
+      if:
+        properties:
+          decision:
+            const: reject
+      then:
+        required: [reason]
+    DecisionAccepted:
+      type: object
+      required: [runId, status]
+      properties:
+        runId:
+          $ref: '#/components/schemas/RunId'
+        status:
+          type: string
+          enum: [publishing, rejected]
+    DecisionRecord:
+      type: object
+      required: [decision, featureSha256, reviewer, decidedAt]
+      properties:
+        decision:
+          $ref: '#/components/schemas/DecisionKind'
+        featureSha256:
+          $ref: '#/components/schemas/Sha256'
+        reviewer:
+          type: object
+          required: [issuer, subject]
+          properties:
+            issuer:
+              type: string
+            subject:
+              type: string
+        decidedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+      if:
+        properties:
+          decision:
+            const: reject
+      then:
+        required: [reason]
+    Publication:
+      type: object
+      required: [outcome, repository, url, commitSha]
+      properties:
+        outcome:
+          type: string
+          enum: [pull_request, already_current]
+        repository:
+          type: string
+          example: MichalBoczula/ECommerceStore.E2E
+        url:
+          type: string
+          format: uri
+          description: PR URL or permalink to the verified feature on main.
+        commitSha:
+          description: Verified PR head SHA or pinned main commit for already_current.
+          $ref: '#/components/schemas/GitSha'
+        pullRequestNumber:
+          type: integer
+          minimum: 1
+        branch:
+          type: string
+      if:
+        properties:
+          outcome:
+            const: pull_request
+      then:
+        required: [pullRequestNumber, branch]
+      examples:
+        - outcome: already_current
+          repository: example/storefront-e2e
+          url: https://github.com/example/storefront-e2e/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/features/catalog/browse-phone-details.feature
+          commitSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    CiEvidence:
+      type: object
+      required: [status, gherkinCheckStatus]
+      properties:
+        status:
+          type: string
+          enum: [pending, passed, failed, not_run, evidence_missing, not_applicable]
+          description: Playwright result for the approved storefront scenario.
+        gherkinCheckStatus:
+          type: string
+          enum: [pending, passed, failed, not_run]
+          description: Independent result from the check job.
+        reasonCode:
+          type: string
+          example: storefront_skipped
+        workflowRunId:
+          type: integer
+          format: int64
+          minimum: 1
+        workflowRunUrl:
+          type: string
+          format: uri
+        runAttempt:
+          type: integer
+          minimum: 1
+        storefrontJobId:
+          type: integer
+          format: int64
+          minimum: 1
+        observedHeadSha:
+          description: PR head SHA that was associated with this workflow attempt.
+          $ref: '#/components/schemas/GitSha'
+        testedCommitSha:
+          description: Actual checked-out commit, which can be the PR merge commit.
+          $ref: '#/components/schemas/GitSha'
+        currentHeadSha:
+          description: Latest observed PR head if available. Evidence stays bound to observedHeadSha.
+          $ref: '#/components/schemas/GitSha'
+        allureArtifact:
+          $ref: '#/components/schemas/AllureArtifact'
+      if:
+        properties:
+          status:
+            const: passed
+      then:
+        required:
+          [workflowRunId, workflowRunUrl, runAttempt, storefrontJobId, observedHeadSha, testedCommitSha, allureArtifact]
+      examples:
+        - status: pending
+          gherkinCheckStatus: pending
+        - status: passed
+          gherkinCheckStatus: passed
+          workflowRunId: 9001
+          workflowRunUrl: https://github.com/example/storefront-e2e/actions/runs/9001
+          runAttempt: 1
+          storefrontJobId: 9002
+          observedHeadSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          testedCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          currentHeadSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          allureArtifact:
+            id: 9003
+            name: storefront-test-results
+            url: https://github.com/example/storefront-e2e/actions/runs/9001/artifacts/9003
+        - status: failed
+          gherkinCheckStatus: passed
+          reasonCode: playwright_failed
+          workflowRunId: 9101
+          workflowRunUrl: https://github.com/example/storefront-e2e/actions/runs/9101
+          runAttempt: 1
+          storefrontJobId: 9102
+          observedHeadSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          testedCommitSha: cccccccccccccccccccccccccccccccccccccccc
+        - status: not_run
+          gherkinCheckStatus: passed
+          reasonCode: storefront_skipped
+          workflowRunId: 9201
+          workflowRunUrl: https://github.com/example/storefront-e2e/actions/runs/9201
+          runAttempt: 1
+          observedHeadSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        - status: evidence_missing
+          gherkinCheckStatus: passed
+          reasonCode: allure_artifact_missing
+          workflowRunId: 9301
+          workflowRunUrl: https://github.com/example/storefront-e2e/actions/runs/9301
+          runAttempt: 1
+          storefrontJobId: 9302
+          observedHeadSha: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          testedCommitSha: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        - status: not_applicable
+          gherkinCheckStatus: not_run
+          reasonCode: already_on_main
+    AllureArtifact:
+      type: object
+      required: [id, name, url]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+        name:
+          type: string
+          pattern: '^storefront-test-results(-attempt-[1-9][0-9]*)?$'
+        url:
+          type: string
+          format: uri
+    RunFailure:
+      type: object
+      required: [code, detail]
+      properties:
+        code:
+          type: string
+          enum:
+            - handoff_not_found
+            - handoff_not_published
+            - handoff_version_mismatch
+            - unsupported_criterion
+            - invalid_qa_proposal
+            - publication_conflict
+            - publication_revision_mismatch
+            - integration_unavailable
+        detail:
+          type: string
+    Problem:
+      type: object
+      required: [title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          enum:
+            - invalid_request
+            - unauthorized
+            - forbidden
+            - run_not_found
+            - idempotency_key_reused
+            - stale_feature_hash
+            - review_closed
+            - orchestrator_unavailable
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        traceId:
+          type: string
