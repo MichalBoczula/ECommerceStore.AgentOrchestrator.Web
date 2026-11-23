@@ -1,0 +1,47 @@
+<div
+  class="review-actions"
+  role="group"
+  aria-label="Review actions"
+  [attr.aria-busy]="submitting()"
+>
+  <button
+    class="button primary-button approve-button"
+    type="button"
+    (click)="approve()"
+    [disabled]="submitting()"
+  >
+    Approve version
+  </button>
+  <details class="rejection">
+    <summary class="button">Reject version…</summary>
+    <form class="rejection-form" novalidate (submit)="reject($event)">
+      <label for="rejection-reason">Reason for rejection</label>
+      <textarea
+        id="rejection-reason"
+        rows="3"
+        #reasonField
+        required
+        [disabled]="submitting()"
+        [value]="reason()"
+        [attr.aria-invalid]="reasonTooLong() ? 'true' : null"
+        aria-describedby="rejection-hint"
+        (input)="reason.set(reasonField.value)"
+      ></textarea>
+      <p id="rejection-hint" class="muted">
+        Enter a reason of up to 2,000 characters.
+      </p>
+      <button
+        class="button reject-button"
+        type="submit"
+        [disabled]="submitting() || !cleanReason() || reasonTooLong()"
+      >
+        Record rejection
+      </button>
+    </form>
+  </details>
+  @if (submitting()) {
+    <p class="muted review-progress" role="status">
+      Saving decision and refreshing the run…
+    </p>
+  }
+</div>

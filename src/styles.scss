@@ -528,6 +528,25 @@ pre code {
   background: #fff2f4;
   border-color: #efbbc8;
 }
+.decision-feedback {
+  margin-bottom: 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #f4d999;
+  border-radius: 0.45rem;
+  background: #fff4da;
+  color: #6d4300;
+  font-size: 0.9rem;
+}
+.decision-feedback[data-result='accepted'] {
+  color: #135c36;
+  background: #e1f6e9;
+  border-color: #a4d4b7;
+}
+.decision-feedback[data-result='blocked'] {
+  color: #8b233c;
+  background: #fff2f4;
+  border-color: #efbbc8;
+}
 .decision {
   margin-top: 0.85rem;
   padding-top: 0.85rem;
