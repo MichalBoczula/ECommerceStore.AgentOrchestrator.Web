@@ -15,6 +15,12 @@ Open [localhost:4200/runs](http://localhost:4200/runs). The development proxy fo
 
 List filters and cursors are part of the URL. A direct link to `/runs/<runId>` fetches the current run. The timeline and evidence come from the API. A deployed host needs an SPA fallback for `/runs/*` and a same-origin proxy for `/api/v1/runs` and its subpaths. The proxy must forward the authenticated caller's authorization to the API.
 
+The CI workflow publishes the verified Web image to Docker Hub on pushes and
+manual runs on `main`. Use the digest in the `image-reference` artifact.
+The container serves Angular on port 8080 and proxies run requests to
+`AO_API_URL`. Set it to the upstream API origin without a path or trailing slash.
+The proxy forwards the caller's `Authorization` header.
+
 ## Review a proposal
 
 Open a run awaiting review and check the Gherkin and its SHA-256. Approve that version or record a rejection with a reason. The API authorizes the caller and accepts one decision per review. The panel fetches the latest run after a decision or a conflict. When the version changes, review the refreshed proposal before submitting again.
