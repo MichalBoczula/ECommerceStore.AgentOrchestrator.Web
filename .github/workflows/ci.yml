@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,7 +17,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,3 +33,60 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Build the Web image
+        run: docker build --label "org.opencontainers.image.revision=${GITHUB_SHA}" -t ecommerce-store-agent-orchestrator-web:ci .
+      - name: Smoke-test container routing and authorization forwarding
+        run: |
+          set -euo pipefail
+          python3 -u - <<'PY' &
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+
+          class Upstream(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  expected = self.path == "/api/v1/runs?limit=1" and self.headers.get("Authorization") == "Bearer ci-web-only"
+                  self.send_response(200 if expected else 400)
+                  self.end_headers()
+
+          HTTPServer(("127.0.0.1", 18081), Upstream).serve_forever()
+          PY
+          upstream="$!"
+          web=""
+          cleanup() {
+            if [[ -n "$web" ]]; then docker rm -f "$web" >/dev/null; fi
+            kill "$upstream"
+          }
+          trap cleanup EXIT
+          web="$(docker run -d --network host -e AO_API_URL=http://127.0.0.1:18081 ecommerce-store-agent-orchestrator-web:ci)"
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 4 \
+            http://127.0.0.1:8080/health/ready
+          curl --fail --silent --show-error http://127.0.0.1:8080/runs/sample | grep '<app-root' >/dev/null
+          curl --fail --silent --show-error -H 'Authorization: Bearer ci-web-only' \
+            'http://127.0.0.1:8080/api/v1/runs?limit=1'
+      - name: Publish the verified image to Docker Hub
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${DOCKER_USER:?Set the DOCKER_USER repository secret}"
+          : "${DOCKER_TOKEN:?Set the DOCKER_TOKEN repository secret}"
+          repository="${DOCKER_USER}/ecommerce-store-agent-orchestrator-web"
+          image="docker.io/$repository"
+          tag="$image:$GITHUB_SHA"
+          printf '%s' "$DOCKER_TOKEN" | docker login --username "$DOCKER_USER" --password-stdin
+          docker tag ecommerce-store-agent-orchestrator-web:ci "$tag"
+          docker push "$tag"
+          digest="$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag" |
+            awk -F@ -v repository="$repository" '$1 == repository || $1 == "docker.io/" repository {print $2; exit}')"
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          mkdir -p artifacts
+          jq -n --arg application 'agent_orchestrator_web' --arg image "$image@$digest" --arg commit "$GITHUB_SHA" \
+            '{application: $application, imageReference: $image, commitSha: $commit}' > artifacts/image-reference.json
+      - name: Upload the immutable image reference
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-reference
+          path: artifacts/image-reference.json
+          if-no-files-found: error
