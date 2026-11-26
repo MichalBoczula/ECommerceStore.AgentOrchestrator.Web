@@ -15,8 +15,9 @@ Open [localhost:4200/runs](http://localhost:4200/runs). The development proxy fo
 
 List filters and cursors are part of the URL. A direct link to `/runs/<runId>` fetches the current run. The timeline and evidence come from the API. A deployed host needs an SPA fallback for `/runs/*` and a same-origin proxy for `/api/v1/runs` and its subpaths. The proxy must forward the authenticated caller's authorization to the API.
 
-The CI workflow publishes the verified Web image to Docker Hub on pushes and
-manual runs on `main`. Use the digest in the `image-reference` artifact.
+CI publishes the tested and scanned Web image to Docker Hub with the commit SHA
+and `latest` tags on pushes to `main`. Manual runs on `main` publish the commit
+SHA tag. Use `imageReference` from the `image-reference` artifact for deployment.
 The container serves Angular on port 8080 and proxies run requests to
 `AO_API_URL`. Set it to the upstream API origin without a path or trailing slash.
 The proxy forwards the caller's `Authorization` header.
