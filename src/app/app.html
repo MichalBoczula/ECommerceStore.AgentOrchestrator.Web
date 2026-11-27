@@ -5,16 +5,50 @@
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
       Agent Orchestrator
     </a>
-    <nav aria-label="Primary">
-      <a
-        routerLink="/runs"
-        routerLinkActive="active"
-        ariaCurrentWhenActive="page"
-        >Runs</a
-      >
-    </nav>
+    @if (entra.canAccessRuns()) {
+      <nav aria-label="Primary">
+        <a
+          routerLink="/runs"
+          routerLinkActive="active"
+          ariaCurrentWhenActive="page"
+          >Runs</a
+        >
+        @if (entra.status() === 'signedIn') {
+          <button
+            type="button"
+            class="button"
+            [disabled]="entra.busy()"
+            (click)="entra.signOut()"
+          >
+            Sign out
+          </button>
+        }
+      </nav>
+    }
   </div>
 </header>
 <main id="main-content" class="shell main" tabindex="-1">
-  <router-outlet />
+  @if (entra.canAccessRuns()) {
+    @if (entra.message(); as message) {
+      <p class="notice" role="alert">{{ message }}</p>
+    }
+    <router-outlet />
+  } @else {
+    <section class="panel padded auth-panel" aria-labelledby="sign-in-heading">
+      <h1 id="sign-in-heading">Sign in with Microsoft Entra</h1>
+      @if (entra.message(); as message) {
+        <p class="notice" role="alert">{{ message }}</p>
+      }
+      @if (entra.status() === 'signedOut') {
+        <button
+          type="button"
+          class="button primary-button"
+          [disabled]="entra.busy()"
+          (click)="entra.signIn()"
+        >
+          Sign in
+        </button>
+      }
+    </section>
+  }
 </main>
