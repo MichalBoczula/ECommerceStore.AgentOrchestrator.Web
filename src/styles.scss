@@ -95,6 +95,7 @@ h3 {
 .header-inner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: clamp(0.85rem, 5vw, 3rem);
   min-height: 4.15rem;
 }
@@ -132,6 +133,11 @@ h3 {
 .brand-mark i:last-child {
   grid-column: 2;
   background: #9fb3ff;
+}
+.app-header nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 .app-header nav a {
   display: inline-block;
@@ -212,6 +218,13 @@ select {
 }
 .padded > h2 {
   margin-bottom: 0.95rem;
+}
+.auth-panel {
+  display: grid;
+  justify-items: start;
+  gap: 1rem;
+  max-width: 34rem;
+  margin-inline: auto;
 }
 .muted {
   color: var(--muted);

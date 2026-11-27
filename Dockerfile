@@ -15,5 +15,9 @@ RUN nginx_repo="https://nginx.org/packages/alpine/v$(cut -d. -f1,2 /etc/alpine-r
 USER 101
 COPY --from=build /app/dist/agent-orchestrator/browser /usr/share/nginx/html
 COPY nginx/default.conf.template /etc/nginx/templates/default.conf.template
-ENV AO_API_URL=http://api:8080 NGINX_ENVSUBST_FILTER=^AO_API_URL$
+ENV AO_API_URL=http://api:8080 \
+    AO_ENTRA_TENANT_ID="" \
+    AO_ENTRA_CLIENT_ID="" \
+    AO_ENTRA_API_CLIENT_ID="" \
+    NGINX_ENVSUBST_FILTER="^(AO_API_URL|AO_ENTRA_TENANT_ID|AO_ENTRA_CLIENT_ID|AO_ENTRA_API_CLIENT_ID)$"
 EXPOSE 8080

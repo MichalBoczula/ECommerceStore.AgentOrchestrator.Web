@@ -22,6 +22,33 @@ The container serves Angular on port 8080 and proxies run requests to
 `AO_API_URL`. Set it to the upstream API origin without a path or trailing slash.
 The proxy forwards the caller's `Authorization` header.
 
+## Enable Entra sign-in
+
+Register a single-tenant application for Orchestrator Web with the **Single-page
+application** platform. Register the Web origin with both paths shown below.
+
+| Path | Purpose |
+| --- | --- |
+| `/auth/redirect` | MSAL redirect bridge for sign-in and token renewal |
+| `/` | Return from sign-out |
+
+Add delegated permissions for `runs.read`, `runs.start`, and `runs.review` from
+the Orchestrator API app registration. Set these public identifiers on the Web
+container.
+
+| Variable | Value |
+| --- | --- |
+| `AO_ENTRA_TENANT_ID` | Directory (tenant) ID |
+| `AO_ENTRA_CLIENT_ID` | Application (client) ID of the Web SPA |
+| `AO_ENTRA_API_CLIENT_ID` | Application (client) ID of the Orchestrator API, exposed under `api://<id>` |
+
+The browser signs in with MSAL, keeps the session in browser session storage, and
+sends an access token on the same-origin runs routes. An empty Entra
+configuration uses the existing caller-supplied bearer setup. For a local Entra
+test, register the same two paths on the local origin and populate
+`src/entra-config.json` with the public `tenantId`, `clientId`, and
+`apiClientId` values.
+
 ## Review a proposal
 
 Open a run awaiting review and check the Gherkin and its SHA-256. Approve that version or record a rejection with a reason. The API authorizes the caller and accepts one decision per review. The panel fetches the latest run after a decision or a conflict. When the version changes, review the refreshed proposal before submitting again.
